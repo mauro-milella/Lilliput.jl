@@ -28,7 +28,7 @@ function count_consecutives(
         counts = Dict{Tuple{I,I},I}()
     end
 
-    for pair in zip(indexes, ids[2:end])
+    for pair in zip(indexes, indexes[2:end])
         counts[pair] = get(counts, pair, 0) + 1
     end
 
