@@ -43,7 +43,7 @@ end
     struct Tokenizer{I<:Integer} <: AbstractTokenizer
         vocabulary_data::Vector{UInt8}
         vocabulary_offsets::Vector{Int}
-        vocabulary_lengths::Vector{Int}
+        vocabulary_bytelengths::Vector{Int}
 
         merges::Dict{Tuple{I,I}, I}
 
@@ -52,13 +52,13 @@ end
 """
 struct Tokenizer{I<:Integer} <: AbstractTokenizer
     # flattened vocabulary, where each token is the following bytes sequence:
-    # view(vocabulary_data, offsets[i] : offsets[i] + lengths[i] - 1)
+    # view(vocabulary_data, offsets[i] : offsets[i] + bytelengths[i] - 1)
     vocabulary_data::Vector{UInt8}
     vocabulary_offsets::Vector{Int}
-    vocabulary_lengths::Vector{Int}
+    vocabulary_bytelengths::Vector{Int}
 
     # two token ids i,j, are merged in merges[(i,j,)]
-    merges::Dict{Tuple{I,I},I}
+    merges_data::Dict{Tuple{I,I},I}
 
     special_tokens::Vector{I}
 
@@ -67,9 +67,9 @@ struct Tokenizer{I<:Integer} <: AbstractTokenizer
     end
 
     function Tokenizer{I}(; alphabet_size=255) where {I<:Integer}
-        vocabulary_data = [UInt8(i) for i in 0:alphabet_size]
-        vocabulary_offsets = [Int(i) for i in 1:(alphabet_size + 1)]
-        vocabulary_lengths = ones(Int, alphabet_size)
+        vocabulary_data = [UInt8(i) for i in 1:alphabet_size]
+        vocabulary_offsets = [Int(i) for i in 1:alphabet_size]
+        vocabulary_bytelengths = ones(Int, alphabet_size)
 
         merges = Dict{Tuple{I,I},I}()
 
@@ -78,7 +78,7 @@ struct Tokenizer{I<:Integer} <: AbstractTokenizer
         return new{I}(
             vocabulary_data,
             vocabulary_offsets,
-            vocabulary_lengths,
+            vocabulary_bytelengths,
             merges,
             special_tokens,
         )
@@ -91,34 +91,52 @@ end
 data(t::Tokenizer) = t.vocabulary_data
 
 """
-    offset(t::Tokenizer) = t.vocabulary_offsets
+    offsets(t::Tokenizer) = t.vocabulary_offsets
 """
-offset(t::Tokenizer) = t.vocabulary_offsets
+offsets(t::Tokenizer) = t.vocabulary_offsets
 
 """
-    lengths(t::Tokenizer) = t.vocabulary_lengths
+    bytelengths(t::Tokenizer) = t.vocabulary_bytelengths
 """
-lengths(t::Tokenizer) = t.vocabulary_lengths
+bytelengths(t::Tokenizer) = t.vocabulary_bytelengths
 
 """
     merges(t::Tokenizer) = t.merges
 """
-merges(t::Tokenizer) = t.merges
+merges(t::Tokenizer) = t.merges_data
 
 """
     special_tokens(t::Tokenizer) = t.special_tokens
 """
 special_tokens(t::Tokenizer) = t.special_tokens
 
+"""
+"""
+function vocabulary_lastindex(t::Tokenizer)
+    # or length(t.vocabulary_bytelengths)
+    return length(t.vocabulary_offsets)
+end
 
 """
     function token(t::Tokenizer, i::Int)
 
 Return the bytes associated with the i-th token ID.
 """
-function token(t::Tokenizer, i::Int)
-    _offset_i = offset(t)[i]
-    return view(data(t), _offset_i:(_offset_i + lengths(t)[i] - 1))
+function token(t::Tokenizer{I}, i::I) where {I}
+    _offset_i = offsets(t)[i]
+    return view(data(t), _offset_i:(_offset_i + bytelengths(t)[i] - 1))
+end
+
+"""
+"""
+function add_token!(t::Tokenizer, bytes::Vector{UInt8})
+    vocabulary_data = data(t)
+    vocabulary_bytelengths = bytelengths(t)
+    vocabulary_offsets = offsets(t)
+
+    push!(vocabulary_bytelengths, length(bytes))
+    push!(vocabulary_offsets, length(vocabulary_data)+1)
+    append!(vocabulary_data, bytes)
 end
 
 """
@@ -127,7 +145,7 @@ end
 struct BasicTokenizer{I<:Integer}
     tokenizer::Tokenizer{I}
 
-    function BasicTokenizer(args..., kwargs...)
+    function BasicTokenizer(args...; kwargs...)
         return BasicTokenizer{UInt16}(args...; kwargs...)
     end
 
@@ -137,80 +155,80 @@ struct BasicTokenizer{I<:Integer}
 end
 
 """
+    tokenizer(bt::BasicTokenizer) = bt.tokenizer
+"""
+tokenizer(bt::BasicTokenizer) = bt.tokenizer
+
+"""
+    function train(
+        bt::BasicTokenizer{I}, vocabulary_size::Int, documents::Vector{String}
+    ) where {I<:Integer}
+
+# Examples
+```jldoctest
+julia> using Lilliput
+
+julia> bt = BasicTokenizer(); 
+
+julia> train(bt, 270, ["Hello, world!", "Hello hello!"])
+
+julia> Char.(token(bt.tokenizer, UInt16(256)))
+2-element Vector{Char}:
+ 'l': ASCII/Unicode U+006C (category Ll: Letter, lowercase)
+ 'l': ASCII/Unicode U+006C (category Ll: Letter, lowercase)
+```
 """
 function train(
     bt::BasicTokenizer{I}, vocabulary_size::Int, documents::Vector{String}
 ) where {I<:Integer}
-    tokenizer = bt.tokenizer
+    _tokenizer = tokenizer(bt)
 
-    @assert vocabulary_size >= length(tokenizer.vocabulary_data)
+    vocabulary_data = data(_tokenizer)
+    vocabulary_data_length = length(vocabulary_data)
+    @assert vocabulary_size >= vocabulary_data_length "No space available"
 
-    num_merges = vocabulary_size - length(tokenizer.vocabulary_data)
+    merges_data = merges(_tokenizer)
+    num_merges = vocabulary_size - vocabulary_data_length
 
-    # ----------------------------
-    # concatenate + UTF-8 bytes
-    # ----------------------------
-    # equivalent to Python: text.encode("utf-8")
-    text_bytes = Vector{UInt8}()
+    # these are token IDs; now, they seem just bytes, byt are combined later 
+    # in heavier integers. You want UInt16 here, probably UInt32.
+    indexes = I[]
     for doc in documents
-        append!(text_bytes, codeunits(doc))
+        append!(indexes, I.(codeunits(doc)))
     end
 
-    # ids = list(text_bytes)
-    ids = Vector{I}(text_bytes)
-
-    merges = Dict{Tuple{I,I},I}()
-    vocab = Dict{I,Vector{UInt8}}()
-
-    # initialize vocab from existing tokenizer state
-    for i in eachindex(tokenizer.vocabulary_offsets)
-        start = tokenizer.vocabulary_offsets[i]
-        len = tokenizer.vocabulary_lengths[i]
-        vocab[I(i - 1)] = tokenizer.vocabulary_data[start:(start + len - 1)]
-    end
-
-    # ----------------------------
-    # BPE merge loop
-    # ----------------------------
     for i in 1:num_merges
-        stats = get_stats(ids)  # Dict{Tuple{I,I}, Int}
+        counts = count_consecutives(indexes)
 
-        pair = findmax(stats)[2]  # most frequent pair
-
-        new_id = I(length(tokenizer.vocabulary_data) + i)
-
-        ids = merge_ids(ids, pair, new_id)
-
-        merges[pair] = new_id
-        vocab[new_id] = vcat(vocab[pair[1]], vocab[pair[2]])
-
-        if verbose
-            println(
-                "merge $i/$num_merges: $pair -> $new_id (",
-                vocab[new_id],
-                ") had ",
-                stats[pair],
-                " occurrences",
-            )
+        # trying to call "findmax" later triggers an ArgumentError; just leave
+        if isempty(counts)
+            break
         end
-    end
+        most_freqpair = findmax(counts)[2] # 2 returns a Tuple{I, I}
 
-    # ----------------------------
-    # store results in tokenizer
-    # ----------------------------
-    tokenizer.merges = merges
+        # token ID for the new token
+        new_id = I(vocabulary_lastindex(_tokenizer) + 1)
 
-    # rebuild flattened vocab representation
-    tokenizer.vocabulary_data = UInt8[]
-    tokenizer.vocabulary_offsets = Int[]
-    tokenizer.vocabulary_lengths = Int[]
+        # replace all the occurrences of the most frequent pair with the new ID
+        indexes = merge(indexes, most_freqpair, new_id)
 
-    for (id, bytes_seq) in sort(collect(vocab); by=x -> x[1])
-        push!(
-            tokenizer.vocabulary_offsets, length(tokenizer.vocabulary_data) + 1
+        merges_data[most_freqpair] = new_id
+
+        add_token!(
+            _tokenizer,
+            vcat(
+                token(_tokenizer, most_freqpair[1]),
+                token(_tokenizer, most_freqpair[2]),
+            ),
         )
-        push!(tokenizer.vocabulary_lengths, length(bytes_seq))
-        append!(tokenizer.vocabulary_data, bytes_seq)
+
+        # println(
+        #     "merge $i/$num_merges: $most_freqpair -> $new_id (",
+        #     token(_tokenizer, new_id),
+        #     ") had ",
+        #     counts[most_freqpair],
+        #     " occurrences",
+        # )
     end
 
     return bt
