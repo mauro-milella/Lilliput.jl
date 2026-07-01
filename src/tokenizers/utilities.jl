@@ -1,11 +1,11 @@
 
 """
     function count_consecutives(
-        ids::AbstractVector{I}; counts::Union{Nothing,Dict{Tuple{I,I},I}}
+        indexes::AbstractVector{I}; counts::Union{Nothing,Dict{Tuple{I,I},I}}
     ) where {I<:Integer}
 
 Return a dictionary of counts, associating each pair of consecutive integers 
-in `ids` to how many times they appear.
+in `indexes` to how many times they appear.
 
 Optionally, update the provided `counts` and return it.
 
@@ -21,15 +21,18 @@ Dict{Tuple{UInt32, UInt32}, UInt32} with 3 entries:
 ```
 """
 function count_consecutives(
-        ids::AbstractVector{I}; counts::Union{Nothing,Dict{Tuple{I,I},I}} = nothing
+    indexes::AbstractVector{I};
+    counts::Union{Nothing,Dict{Tuple{I,I},I}}=nothing,
 ) where {I<:Integer}
     if isnothing(counts)
         counts = Dict{Tuple{I,I},I}()
     end
 
-    for pair in zip(ids, ids[2:end])
+    for pair in zip(indexes, ids[2:end])
         counts[pair] = get(counts, pair, 0) + 1
     end
 
     return counts
 end
+
+# function merge(indexes::) end
