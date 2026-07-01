@@ -1,5 +1,5 @@
 Example page.
 
 ```@autodocs
-Modules = [Lilliput]
+Modules = [Lilliput, Lilliput.Tokenizers]
 ```

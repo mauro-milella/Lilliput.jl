@@ -2,5 +2,8 @@ using Documenter
 using Lilliput
 
 makedocs(;
-    sitename="Lilliput.jl documentation", modules=[Lilliput], remotes=nothing, doctest=true
+    sitename="Lilliput.jl documentation",
+    modules=[Lilliput, Lilliput.Tokenizers],
+    remotes=nothing,
+    doctest=true,
 )
