@@ -45,7 +45,7 @@ end
         throw(MethodError(encode, (at, text,)))
     end
 
-Encode the given `text` as a list of text IDs (integers).
+Encode the given `text` as a list of token IDs (integers).
 """
 function encode(at::AbstractTokenizer, text::String)::Vector{<:Integer}
     throw(MethodError(encode, (at, text)))
@@ -56,7 +56,7 @@ end
         throw(MethodError(decode, (at, alphabet_size)))
     end
 
-Decode a list of integers into a string.
+Decode a list of token IDs into a string.
 """
 function decode(at::AbstractTokenizer, alphabet_size::Vector{<:Integer})::String
     throw(MethodError(decode, (at, alphabet_size)))
