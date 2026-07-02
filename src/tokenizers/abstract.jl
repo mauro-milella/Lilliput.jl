@@ -147,7 +147,8 @@ Add a new token to the tokenizer, by appending the bytes to the raw `data`
 collection, and incrementing by one the size of the `byteslengths` and `offsets`
 collections.
 
-See also [`data(t::AbstractTokenizer)`](@ref), [`bytelengths(t::Tokenizer)`](@ref),
+See also [`data(t::AbstractTokenizer)`](@ref), 
+[`bytelengths(t::AbstractTokenizer)`](@ref),
 [`offsets(t::AbstractTokenizer)`](@ref).
 """
 function add_token!(t::AbstractTokenizer, bytes::Vector{UInt8})
