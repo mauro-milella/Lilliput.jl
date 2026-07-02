@@ -10,7 +10,6 @@ export tokenizer, data, offsets, bytelengths, merges, special_tokens
 export vocabulary_lastindex, token, add_token!
 
 include("bpe.jl")
-export Tokenizer
-export BasicTokenizer
+export BPETokenizer
 
 end
