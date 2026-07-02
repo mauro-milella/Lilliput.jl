@@ -135,7 +135,7 @@ end
 
 Return the bytes associated with the i-th token ID.
 """
-function token(t::AbstractTokenizer{I}, i::I) where {I}
+function token(t::AbstractTokenizer, i::I) where {I<:Integer}
     _offset_i = offsets(t)[i]
     return view(data(t), _offset_i:(_offset_i + bytelengths(t)[i] - 1))
 end
