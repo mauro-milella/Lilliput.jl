@@ -127,7 +127,26 @@ end
 
 
 """
-    
+    function encode(bpetok::BPETokenizer{I}, document::String) where {I}
+
+Encode a document into a list of token IDS.
+
+# Examples
+```jldoctest
+julia> using Lilliput
+
+julia> bpetok = BPETokenizer(); 
+
+julia> train(bpetok, 270, ["Hello, world!", "Hello hello!"]);
+
+julia> encoding = encode(bpetok, "Hello, ")
+2-element Vector{UInt16}:
+ 0x0103
+ 0x0107
+
+julia> decode(bpetok, encoding)
+"Hello, "
+```
 """
 function encode(bpetok::BPETokenizer{I}, document::String) where {I}
     indexes = I.(codeunits(document))
