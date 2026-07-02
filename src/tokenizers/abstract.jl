@@ -5,6 +5,7 @@ Generic tokenizer.
 
 Must implement the following:
 
+- tokenizer(::AbstractTokenizer)
 - data(::AbstractTokenizer)
 - offsets(::AbstractTokenizer)
 - bytelengths(::AbstractTokenizer)
@@ -59,6 +60,18 @@ Decode a list of integers into a string.
 """
 function decode(at::AbstractTokenizer, alphabet_size::Vector{<:Integer})::String
     throw(MethodError(decode, (at, alphabet_size)))
+end
+
+"""
+    function tokenizer(t::AbstractTokenizer)
+
+Default getter for a tokenizer (itself).
+
+This is useful if you are wrapping a tokenizer with a structure of type
+[`AbstractTokenizer`](@ref).
+"""
+function tokenizer(t::AbstractTokenizer)
+    return t
 end
 
 """
