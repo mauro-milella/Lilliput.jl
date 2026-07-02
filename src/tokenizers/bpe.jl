@@ -46,15 +46,15 @@ struct BPETokenizer{I<:Integer} <: AbstractTokenizer
     end
 end
 
-data(t::BPETokenizer) = t.vocabulary_data
-offsets(t::BPETokenizer) = t.vocabulary_offsets
-bytelengths(t::BPETokenizer) = t.vocabulary_bytelengths
-merges(t::BPETokenizer) = t.merges_data
-special_tokens(t::BPETokenizer) = t.special_tokens
+data(bpet::BPETokenizer) = bpet.vocabulary_data
+offsets(bpet::BPETokenizer) = bpet.vocabulary_offsets
+bytelengths(bpet::BPETokenizer) = bpet.vocabulary_bytelengths
+merges(bpet::BPETokenizer) = bpet.merges_data
+special_tokens(bpet::BPETokenizer) = bpet.special_tokens
 
 """
     function train(
-        bt::BPETokenizer{I}, vocabulary_size::Int, documents::Vector{String}
+        bpetok::BPETokenizer{I}, vocabulary_size::Int, documents::Vector{String}
     ) where {I<:Integer}
 
 Learn/train/build a vocabulary from the given documents, leveraging a BPE
@@ -68,24 +68,24 @@ See also:
 ```jldoctest
 julia> using Lilliput
 
-julia> bt = BPETokenizer(); 
+julia> bpetok = BPETokenizer(); 
 
-julia> train(bt, 270, ["Hello, world!", "Hello hello!"])
+julia> train(bpetok, 270, ["Hello, world!", "Hello hello!"])
 
-julia> Char.(token(bt, UInt16(256)))
+julia> Char.(token(bpetok, UInt16(256)))
 2-element Vector{Char}:
  'l': ASCII/Unicode U+006C (category Ll: Letter, lowercase)
  'l': ASCII/Unicode U+006C (category Ll: Letter, lowercase)
 ```
 """
 function train(
-    bt::BPETokenizer{I}, vocabulary_size::Int, documents::Vector{String}
+    bpetok::BPETokenizer{I}, vocabulary_size::Int, documents::Vector{String}
 ) where {I<:Integer}
-    vocabulary_data = data(bt)
+    vocabulary_data = data(bpetok)
     vocabulary_data_length = length(vocabulary_data)
     @assert vocabulary_size >= vocabulary_data_length "No space available"
 
-    merges_data = merges(bt)
+    merges_data = merges(bpetok)
     num_merges = vocabulary_size - vocabulary_data_length
 
     # these are token IDs; now, they seem just bytes, byt are combined later 
@@ -105,7 +105,7 @@ function train(
         most_freqpair = findmax(counts)[2] # 2 returns a Tuple{I, I}
 
         # token ID for the new token
-        new_id = I(vocabulary_lastindex(bt) + 1)
+        new_id = I(vocabulary_lastindex(bpetok) + 1)
 
         # replace all the occurrences of the most frequent pair with the new ID
         indexes = merge(indexes, most_freqpair, new_id)
@@ -113,13 +113,38 @@ function train(
         merges_data[most_freqpair] = new_id
 
         add_token!(
-            bt,
+            bpetok,
             vcat(
-                token(bt, most_freqpair[1]),
-                token(bt, most_freqpair[2]),
+                token(bpetok, most_freqpair[1]),
+                token(bpetok, most_freqpair[2]),
             ),
         )
     end
 
-    return bt
+    return bpetok
 end
+
+function encode()
+end
+
+"""
+# Examples
+```jldoctest
+julia> using Lilliput
+
+julia> bpetok = BPETokenizer(); 
+
+julia> train(bpetok, 270, ["Hello, world!", "Hello hello!"]);
+
+julia> decode(bpetok, UInt16[259, 32, 256])
+"Hello ll"
+```
+"""
+function decode(bpetok::BPETokenizer{I}, indexes::Vector{I}) where {I}
+    bytes = UInt8[]
+    for index in indexes
+        append!(bytes, token(bpetok, index))
+    end
+    return String(bytes)
+end
+
