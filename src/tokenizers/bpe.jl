@@ -73,7 +73,7 @@ julia> using Lilliput
 
 julia> bpetok = BPETokenizer(); 
 
-julia> train(bpetok, 270, ["Hello, world!", "Hello hello!"])
+julia> train(bpetok, 270, ["Hello, world!", "Hello hello!"]);
 
 julia> Char.(token(bpetok, UInt16(256)))
 2-element Vector{Char}:
@@ -148,9 +148,10 @@ julia> bpetok = BPETokenizer();
 julia> train(bpetok, 270, ["Hello, world!", "Hello hello!"]);
 
 julia> encoding = encode(bpetok, "Hello, ")
-2-element Vector{UInt16}:
+3-element Vector{UInt16}:
  0x0103
- 0x0107
+ 0x002c
+ 0x0020
 
 julia> decode(bpetok, encoding)
 "Hello, "
