@@ -22,7 +22,8 @@ struct BPETokenizer{I<:Integer} <: AbstractTokenizer
     # two token ids i,j, are merged in merges[(i,j,)]
     merges_data::Dict{Tuple{I,I},I}
 
-    special_tokens::Vector{I}
+    # e.g., "<|endoftext|>: 100257"
+    special_tokens::Dict{String,I}
 
     function BPETokenizer(args...; kwargs...)
         return BPETokenizer{UInt16}(args...; kwargs...)
@@ -35,7 +36,7 @@ struct BPETokenizer{I<:Integer} <: AbstractTokenizer
 
         merges = Dict{Tuple{I,I},I}()
 
-        special_tokens = I[]
+        special_tokens = Dict{String,I}()
 
         return new{I}(
             vocabulary_data,
