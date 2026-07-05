@@ -234,7 +234,7 @@ function save(t::AbstractTokenizer, fileprefix::String; version::String="minbpe 
         # print the number of special tokens (and themselves) if any 
         _special_tokens = nothing
         try 
-            _special_tokens = special_tokens()
+            _special_tokens = special_tokens(t)
         catch
             _special_tokens = Dict{String, I}()
         end
