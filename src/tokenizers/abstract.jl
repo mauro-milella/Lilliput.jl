@@ -10,6 +10,7 @@ Must implement the following:
 - offsets(::AbstractTokenizer)
 - bytelengths(::AbstractTokenizer)
 - merges(::AbstractTokenizer)
+- pattern(::AbstractTokenizer)
 - special_tokens(::AbstractTokenizer)
 - train(::AbstractTokenizer, ::Int, ::Vector{String})
 - encode(::AbstractTokenizer, ::String)
@@ -20,6 +21,8 @@ Offers the following minimal utilities:
 - vocabulary_size(::AbstractTokenizer)
 - token(::AbstractTokenizer, i::I) where {I<:Integer}
 - add_token!(::AbstractTokenizer, bytes::Vector{UInt8})
+- save(::AbstractTokenizer, fileprefix::String)
+- load(fileprefix::String)
 """
 abstract type AbstractTokenizer end
 
@@ -113,6 +116,15 @@ function merges(t::AbstractTokenizer)
 end
 
 """
+    function pattern(t::AbstractTokenizer)
+
+Return the pattern leveraged by the tokenizer.
+"""
+function pattern(t::AbstractTokenizer)
+    throw(MethodError(pattern, (t,)))
+end
+
+"""
     special_tokens(t::AbstractTokenizer) = t.special_tokens
 """
 function special_tokens(t::AbstractTokenizer)
@@ -160,3 +172,46 @@ function add_token!(t::AbstractTokenizer, bytes::Vector{UInt8})
     push!(vocabulary_offsets, length(vocabulary_data)+1)
     append!(vocabulary_data, bytes)
 end
+
+"""
+    function save(t::AbstractTokenizer, fileprefix::String)
+
+Save `<fileprefix>.model` file for loading back the tokenizer, and 
+`<fileprefix>.vocab for human inspection.
+"""
+function save(t::AbstractTokenizer, fileprefix::String)
+    # write the model: to be used in load() later
+    modelfile = fileprefix + ".model"
+    open(modelfile, "w") do f
+        f.write("minbpe v1\n")
+        f.write(f"{self.pattern}\n")
+        # write the special tokens, first the number of them, then each one
+        f.write(f"{len(self.special_tokens)}\n")
+        for special, idx in self.special_tokens.items():
+            f.write(f"{special} {idx}\n")
+        # the merges dict
+        for idx1, idx2 in self.merges:
+            f.write(f"{idx1} {idx2}\n")
+
+        # write the vocab: for the human to look at
+        vocab_file = fileprefix + ".vocab"
+        inverted_merges = {idx: pair for pair, idx in self.merges.items()}
+        with open(vocab_file, "w", encoding="utf-8") as f:
+            for idx, token in self.vocab.items():
+                # note: many tokens may be partial utf-8 sequences
+                # and cannot be decoded into valid strings. Here we're using
+                # errors='replace' to replace them with the replacement char �.
+                # this also means that we couldn't possibly use .vocab in load()
+                # because decoding in this way is a lossy operation!
+                s = render_token(token)
+                # find the children of this token, if any
+                if idx in inverted_merges:
+                    # if this token has children, render it nicely as a merge
+                    idx0, idx1 = inverted_merges[idx]
+                    s0 = render_token(self.vocab[idx0])
+                    s1 = render_token(self.vocab[idx1])
+                    f.write(f"[{s0}][{s1}] -> [{s}] {idx}\n")
+                else:
+                    # otherwise this is leaf token, just print it
+                    # (this should just be the first 256 tokens, the bytes)
+                    f.write(f"[{s}] {idx}\n")
