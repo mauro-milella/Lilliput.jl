@@ -26,6 +26,7 @@ Offers the following minimal utilities:
 """
 abstract type AbstractTokenizer end
 
+
 """
     function train(
         abstract_tokenizer::AbstractTokenizer,
@@ -153,6 +154,19 @@ function token(t::AbstractTokenizer, i::I) where {I<:Integer}
 end
 
 """
+    function render(_token::Vector{UInt8})
+
+Pretty print the bytes in render.
+This is a naive and unsafe implementation, substituting newlines with a string
+`<|newline|>` and tabs with `<|tab|>`.
+
+We should wrap every dangerous symbol in a safe control sequence.
+"""
+function render(_tokens::Vector{UInt8})
+    replace(String(_tokens), "\n" => "<|newline|>", "\t" => "<|tab|>")
+end
+
+"""
     function add_token!(t::AbstractTokenizer, bytes::Vector{UInt8})
 
 Add a new token to the tokenizer, by appending the bytes to the raw `data`
@@ -174,44 +188,97 @@ function add_token!(t::AbstractTokenizer, bytes::Vector{UInt8})
 end
 
 """
+    function precision(::AbstractTokenizer)
+
+Return the integer precision within the `merges` structure of a tokenizer.
+"""
+function precision(t::AbstractTokenizer)
+    # you could do precision(::AbstractTokenizer{I}) where {I} return I
+    # but I don't want to make every child of AbstractTokenizer so constrained
+    #
+    # eltype().parameters returns svec(Tuple{UInt16, UInt16}, UInt16)
+    # we assume merge is a dictionary 
+    return eltype(merges(t)).parameters[2]
+end
+
+"""
     function save(t::AbstractTokenizer, fileprefix::String)
 
 Save `<fileprefix>.model` file for loading back the tokenizer, and 
 `<fileprefix>.vocab for human inspection.
-"""
-function save(t::AbstractTokenizer, fileprefix::String)
-    # write the model: to be used in load() later
-    modelfile = fileprefix + ".model"
-    open(modelfile, "w") do f
-        f.write("minbpe v1\n")
-        f.write(f"{self.pattern}\n")
-        # write the special tokens, first the number of them, then each one
-        f.write(f"{len(self.special_tokens)}\n")
-        for special, idx in self.special_tokens.items():
-            f.write(f"{special} {idx}\n")
-        # the merges dict
-        for idx1, idx2 in self.merges:
-            f.write(f"{idx1} {idx2}\n")
 
-        # write the vocab: for the human to look at
-        vocab_file = fileprefix + ".vocab"
-        inverted_merges = {idx: pair for pair, idx in self.merges.items()}
-        with open(vocab_file, "w", encoding="utf-8") as f:
-            for idx, token in self.vocab.items():
-                # note: many tokens may be partial utf-8 sequences
-                # and cannot be decoded into valid strings. Here we're using
-                # errors='replace' to replace them with the replacement char �.
-                # this also means that we couldn't possibly use .vocab in load()
-                # because decoding in this way is a lossy operation!
-                s = render_token(token)
-                # find the children of this token, if any
-                if idx in inverted_merges:
-                    # if this token has children, render it nicely as a merge
-                    idx0, idx1 = inverted_merges[idx]
-                    s0 = render_token(self.vocab[idx0])
-                    s1 = render_token(self.vocab[idx1])
-                    f.write(f"[{s0}][{s1}] -> [{s}] {idx}\n")
-                else:
-                    # otherwise this is leaf token, just print it
-                    # (this should just be the first 256 tokens, the bytes)
-                    f.write(f"[{s}] {idx}\n")
+# Examples
+```jldoctest
+julia> println("TODO:")
+```
+"""
+function save(t::AbstractTokenizer, fileprefix::String; version::String="minbpe v1")
+    I = precision(t)
+
+    # write the model: to be used in load() later
+    modelfile = fileprefix * ".model"
+
+    open(modelfile, "w") do f
+        # might be useful
+        write(f, "$version\n")
+
+        # print the regex used, if any
+        _pattern = nothing
+        try
+            _pattern = pattern(t)
+        catch
+            _pattern = ""
+        end
+        write(f, "$_pattern\n")
+
+        # print the number of special tokens (and themselves) if any 
+        _special_tokens = nothing
+        try 
+            _special_tokens = special_tokens()
+        catch
+            _special_tokens = Dict{String, I}()
+        end
+        write(f, "$(length(special_tokens(t)))\n")
+        for (token, index) in _special_tokens(t)
+            write(f, "$token $index\n")
+        end
+
+        # print the trained merges        
+        # remember index is just a synonym for tokenID
+        for (index1, index2) in merges(t)
+            f.write(f, "$index1 $index2\n")
+        end
+    end
+
+    # create the human-readable file with the vocabulary
+    vocabfile = fileprefix * ".vocab"
+    inverted_merges = Dict{I, Pair{I,I}}([b => a for (a,b) in merges(t)])
+
+    open(vocabfile, "w") do f
+        max_index = vocabulary_size(t)
+        for current_index in 1:max_index
+            token1 = token(t, current_index)
+            token1_string = render(token1)
+
+            if token1 in inverted_merges
+                token2, token3 = inverted_merges[token1]
+                token2_string = render(token2)
+                token3_string = render(token3)
+
+                f.write(f, "($token2_string) ($token3_string) => " * 
+                        "$token1_string $(current_index)\n")
+            else
+                f.write(f, "($token1_string) $(current_index)\n")
+            end
+        end
+    end
+end
+
+"""
+    function load(fileprefix::String)
+
+Read the model file produced by a call to [`save`](@ref).
+"""
+function load(filepath::String)
+    # TODO
+end
