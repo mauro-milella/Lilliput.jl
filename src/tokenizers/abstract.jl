@@ -209,7 +209,11 @@ Save `<fileprefix>.model` file for loading back the tokenizer, and
 
 # Examples
 ```jldoctest
-julia> println("TODO:")
+julia> using Lilliput
+
+julia> bpetok = BPETokenizer(); 
+
+julia> train(bpetok, 270, ["Hello, world!", "Hello hello!"]);
 ```
 """
 function save(t::AbstractTokenizer, fileprefix::String; version::String="minbpe v1")
