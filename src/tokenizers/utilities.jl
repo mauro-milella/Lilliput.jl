@@ -80,3 +80,16 @@ function merge(
 
     return new_indexes[1:(j - 1)]
 end
+
+"""
+    function render(_token::Vector{UInt8})
+
+Pretty print the bytes in render.
+This is a naive and unsafe implementation, substituting newlines with a string
+`<|newline|>` and tabs with `<|tab|>`.
+
+We should wrap every dangerous symbol in a safe control sequence.
+"""
+function render(_tokens::Vector{UInt8})
+    replace(String(_tokens), "\n" => "<|newline|>", "\t" => "<|tab|>")
+end
