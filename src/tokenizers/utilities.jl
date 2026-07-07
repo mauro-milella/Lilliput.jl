@@ -62,7 +62,7 @@ function merge(
     i = 1 # main iterator on indexes; jumps when a pair matches
     j = 1 # keeps track of the last available index in new_indexes
 
-    while i <= indexes_length-1
+    while i <= indexes_length - 1
         if indexes[i] == p0 && indexes[i + 1] == p1
             new_indexes[j] = new_index
             i += 2
@@ -81,6 +81,26 @@ function merge(
     return new_indexes[1:(j - 1)]
 end
 
+function _replace_control_characters(s::AbstractString)
+    # https://github.com/JuliaLang/julia/blob/master/base/strings/unicode.jl
+    # http://www.unicode.org/reports/tr44/#GC_Values_Table
+    # especially Cc ("control characters") are subtle when writing them
+    other_categories = ["Cc", "Cf", "Cs", "Co", "Cn"]
+
+    chars = Char[]
+
+    for c in s
+        if !(Base.Unicode.category_abbrev(c) in other_categories)
+            push!(chars, c)
+        else
+            # unicode escape, such as "\\u000a" for c = '\n'
+            push!(chars, "\\u" * string(UInt32(c), base=16, pad=4))
+        end
+    end
+
+    return chars
+end
+
 """
     function render(_token::Vector{UInt8})
 
@@ -91,5 +111,7 @@ This is a naive and unsafe implementation, substituting newlines with a string
 We should wrap every dangerous symbol in a safe control sequence.
 """
 function render(_tokens::Vector{UInt8})
-    replace(String(_tokens), "\n" => "<|newline|>", "\t" => "<|tab|>")
+    # see https://github.com/JuliaLang/julia/blob/master/base/strings/unicode.jl
+    s = Base.Unicode.normalize(String(_tokens), :NFKD)
+    return _replace_control_characters(s)
 end
