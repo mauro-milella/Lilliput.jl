@@ -105,10 +105,8 @@ end
     function render(_token::Vector{UInt8})
 
 Pretty print the bytes in render.
-This is a naive and unsafe implementation, substituting newlines with a string
-`<|newline|>` and tabs with `<|tab|>`.
-
-We should wrap every dangerous symbol in a safe control sequence.
+Bytes are converted in na string, where Unicode sequences that are dangerous
+to print (e.g., '\n') are escaped.
 """
 function render(_tokens::Vector{UInt8})
     # see https://github.com/JuliaLang/julia/blob/master/base/strings/unicode.jl
