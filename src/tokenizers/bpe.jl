@@ -30,6 +30,7 @@ struct BPETokenizer{I<:Integer} <: AbstractTokenizer
     end
 
     function BPETokenizer{I}(; alphabet_size=255) where {I<:Integer}
+        # TODO: should be codeunits(string(Char(130)))
         vocabulary_data = [UInt8(i) for i in 1:alphabet_size]
         vocabulary_offsets = [Int(i) for i in 1:alphabet_size]
         vocabulary_bytelengths = ones(Int, alphabet_size)
