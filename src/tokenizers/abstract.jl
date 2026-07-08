@@ -200,6 +200,12 @@ julia> using Lilliput
 julia> bpetok = BPETokenizer(); 
 
 julia> train(bpetok, 270, ["Hello, world!", "Hello hello!"]);
+
+# copy-paste version: save(bpetok, "bpe-test-training")
+julia> mktempdir() do d 
+        path = joinpath(d, "bpe-test-training")
+        save(bpetok, path)
+    end
 ```
 """
 function save(
@@ -252,8 +258,12 @@ function save(
             token1 = token(t, current_index)
             token1_string = render(token1)
 
-            if haskey(inverted_merges, token1)
-                token2, token3 = inverted_merges[token1]
+            if haskey(inverted_merges, current_index)
+                index2, index3 = inverted_merges[current_index]
+
+                token2 = token(t, index2)
+                token3 = token(t, index3)
+
                 token2_string = render(token2)
                 token3_string = render(token3)
 
