@@ -111,6 +111,19 @@ to print (e.g., '\n') are escaped.
 """
 function render(_tokens::AbstractVector{UInt8})
     # see https://github.com/JuliaLang/julia/blob/master/base/strings/unicode.jl
-    s = Base.Unicode.normalize(String(_tokens), :NFKD)
-    return _replace_control_characters(s)
+    s = nothing
+
+    try
+        # not everything can be converted to UTF-8; this is a lossy encoding 
+        # to a human-readable form of raw bytes
+        s = Base.Unicode.normalize(String(copy(_tokens)), :NFKD)
+    catch
+        # we fallback to the replacement character
+        # https://en.wikipedia.org/wiki/Specials_(Unicode_block)
+        s = "�"
+    end
+
+    c = _replace_control_characters(s)
+
+    return c
 end
