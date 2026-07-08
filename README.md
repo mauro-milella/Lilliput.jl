@@ -23,4 +23,5 @@ This is a good compromise between sketching and showcasing examples of use-cases
 ### Useful Resources
 
 - [LLMs-from-scratch](https://github.com/rasbt/LLMs-from-scratch);
-- [minbpe](https://github.com/karpathy/minbpe/).
+- [minbpe](https://github.com/karpathy/minbpe/);
+- [Julia Base.Unicode](https://github.com/JuliaLang/julia/blob/master/base/strings/unicode.jl), which seems to be adapted from [utf8 proc](https://juliastrings.github.io/utf8proc/).
