@@ -28,5 +28,5 @@ LocalPreferences.toml
 JuliaLocalPreferences.toml
 
 # Description of a tokenizer
-.model
-.vocab
+*.model
+*.vocab
