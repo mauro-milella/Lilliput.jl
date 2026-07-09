@@ -194,7 +194,7 @@ Save `<fileprefix>.model` file for loading back the tokenizer, and
 `<fileprefix>.vocab for human inspection.
 
 # Examples
-```jldoctest
+```julia
 julia> using Lilliput
 
 julia> bpetok = BPETokenizer(); 
