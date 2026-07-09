@@ -109,7 +109,7 @@ Check whether the given bytes are a valid UTF-8 string and return them.
 
 If it is not the case, return the replacement Unicode character `\uFFFD` (�).
 
-See [`Base.isvalid`](@ref),
+See `Base.isvalid`,
 [replacement character](https://en.wikipedia.org/wiki/Specials_(Unicode_block)).
 """
 function _utf8_or_replacementchar!(bytes::AbstractVector{UInt8})
