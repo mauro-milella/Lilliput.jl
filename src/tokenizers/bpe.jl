@@ -30,10 +30,22 @@ struct BPETokenizer{I<:Integer} <: AbstractTokenizer
     end
 
     function BPETokenizer{I}(; alphabet_size=255) where {I<:Integer}
-        # TODO: should be codeunits(string(Char(130)))
-        vocabulary_data = [UInt8(i) for i in 1:alphabet_size]
-        vocabulary_offsets = [Int(i) for i in 1:alphabet_size]
-        vocabulary_bytelengths = ones(Int, alphabet_size)
+        # fill the vocabulary data, while keeping track of how many bytes 
+        # are pushed in the vocabulary (where they are pushed and their length)
+        _offset = 1
+        vocabulary_data = [] # it is hard to estimate the size of this
+        vocabulary_offsets = []
+        vocabulary_bytelengths = []
+        for i in 1:alphabet_size
+            bytes = codeunits(string(Char(i)))
+            len = length(bytes)
+
+            append!(vocabulary_data, bytes)
+            push!(vocabulary_offsets, _offset)
+            push!(vocabulary_bytelengths, len)
+
+            _offset += len
+        end
 
         merges = Dict{Tuple{I,I},I}()
 
@@ -105,7 +117,9 @@ function train(
     # in heavier integers. You want UInt16 here, probably UInt32.
     indexes = I[]
     for doc in documents
-        append!(indexes, I.(codeunits(doc)))
+        for c in doc
+            append!(indexes, I(codepoint(c)))
+        end
     end
 
     for _ in 1:num_merges
