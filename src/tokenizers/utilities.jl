@@ -103,7 +103,6 @@ function _replace_control_characters(s::AbstractString)
     return join(chars)
 end
 
-
 """
 Check whether the given bytes are a valid UTF-8 string and return them.
 
