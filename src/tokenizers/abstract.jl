@@ -169,17 +169,17 @@ function add_token!(t::AbstractTokenizer, bytes::Vector{UInt8})
     vocabulary_offsets = offsets(t)
 
     push!(vocabulary_bytelengths, length(bytes))
-    push!(vocabulary_offsets, length(vocabulary_data)+1)
-    append!(vocabulary_data, bytes)
+    push!(vocabulary_offsets, length(vocabulary_data) + 1)
+    return append!(vocabulary_data, bytes)
 end
 
 """
-    function precision(::AbstractTokenizer)
+    function tokenprecision(::AbstractTokenizer)
 
-Return the integer precision within the `merges` structure of a tokenizer.
+Return the integer tokenprecision within the `merges` structure of a tokenizer.
 """
-function precision(t::AbstractTokenizer)
-    # you could do precision(::AbstractTokenizer{I}) where {I} return I
+function tokenprecision(t::AbstractTokenizer)
+    # you could do tokenprecision(::AbstractTokenizer{I}) where {I} return I
     # but I don't want to make every child of AbstractTokenizer so constrained
     #
     # eltype().parameters returns svec(Tuple{UInt16, UInt16}, UInt16)
@@ -201,17 +201,16 @@ julia> bpetok = BPETokenizer();
 
 julia> train(bpetok, 270, ["Hello, world!", "Hello hello!"]);
 
-# copy-paste version: save(bpetok, "bpe-test-training")
 julia> mktempdir() do d 
-        path = joinpath(d, "bpe-test-training")
-        save(bpetok, path)
-    end
+    path = joinpath(d, "bpe-test-training")
+    save(bpetok, path)
+end
 ```
 """
 function save(
     t::AbstractTokenizer, fileprefix::String; version::String="minbpe v1"
 )
-    I = precision(t)
+    I = tokenprecision(t)
 
     # write the model: to be used in load() later
     modelfile = fileprefix * ".model"
@@ -219,6 +218,7 @@ function save(
     open(modelfile, "w") do f
         # might be useful
         write(f, "$version\n")
+        write(f, string(I))
 
         # print the regex used, if any
         _pattern = nothing
@@ -243,7 +243,7 @@ function save(
 
         # print the trained merges        
         # remember index is just a synonym for tokenID
-        for (index1, index2) in merges(t)
+        for (index1, index2) in sort(collect(merges(t)); by=x->x[2])
             write(f, "$index1 $index2\n")
         end
     end
@@ -283,7 +283,118 @@ end
     function load(fileprefix::String)
 
 Read the model file produced by a call to [`save`](@ref).
+
+```julia
+julia> using Lilliput
+
+julia> bpetok = BPETokenizer(); 
+
+julia> train(bpetok, 270, ["Hello, world!", "Hello hello!"]);
+
+julia> save(bpetok, "bpe-test-training")
+
+julia> loadedbpetok = load("bpe-test-training")
+
+julia> loadedbpetok.vocabulary_data == bpetok.vocabulary_data
+true
+
+julia> loadedbpetok.merges_data == bpetok.merges_data
+true
+```
+
 """
 function load(filepath::String)
-    # TODO
+    @assert endswith(filepath, ".model") "Please provide a .model file " *
+        "(you provided: $filepath)"
+
+    # from this token ID (included), learned tokens are represented in merges
+    initial_index = Int(256)
+
+    # f is a file to be read, compliant with BPETokenizer's implementation;
+    # when this is called, the version (the first header row) is already red.
+    function _load_bpetokenizer(f)
+        # first, read the integer precision;
+        # this translates, say, :UInt16 in the corresponding DataType 
+        I = getfield(Base, Symbol(readline(f)))
+
+        merges_data = Dict{Tuple{I,I},I}()
+        vocabulary_data = Vector{UInt8}()
+        vocabulary_offsets = Vector{Int}()
+        vocabulary_bytelengths = Vector{Int}()
+        special_tokens = Dict{String,I}()
+
+        # first of all, we need to reconstruct the vocabulary
+        _offset = 1
+        for i in 1:(initial_index-1) # (the original alphabet size)
+            bytes = codeunits(string(Char(i)))
+            len = length(bytes)
+
+            append!(vocabulary_data, bytes)
+            push!(vocabulary_offsets, _offset)
+            push!(vocabulary_bytelengths, len)
+
+            _offset += len
+        end
+
+        # similar to token(::AbstractTokenizer, id::Int), but without tokenizer
+        function _token_bytes(id)
+            offset = vocabulary_offsets[id]
+            len = vocabulary_bytelengths[id]
+
+            return view(vocabulary_data, offset:(offset + len - 1))
+        end
+
+        # another utility
+        function _strip_parentheses(t)
+            return strip(t, ['(', ')', ','])
+        end
+
+        # special tokens
+        nspecials = parse(Int, strip(readline(f)))
+        for _ in 1:nspecials
+            line = readline(f)
+            token, index = split(strip(line))
+
+            token = _strip_parentheses(token)
+            special_tokens[token] = parse(I, index)
+        end
+
+        # read the merges
+        for line in eachline(f)
+            index1, index2, new_id = split(strip(line))
+
+            index1 = parse(I, _strip_parentheses(index1))
+            index2 = parse(I, _strip_parentheses(index2))
+            new_id = parse(I, new_id)
+
+            # create a new token from existing ones
+            token_bytes = vcat(_token_bytes(index1), _token_bytes(index2))
+            # not correct
+            # token_bytes = collect(codeunits(string(Char(index1), Char(index2))))
+            
+            push!(vocabulary_offsets, length(vocabulary_data) + 1)
+            push!(vocabulary_bytelengths, length(token_bytes))
+            append!(vocabulary_data, token_bytes)
+
+            merges_data[(index1, index2)] = new_id
+        end
+
+        return BPETokenizer{I}(
+            vocabulary_data,
+            vocabulary_offsets,
+            vocabulary_bytelengths,
+            merges_data,
+            special_tokens,
+        )
+    end
+
+    open(filepath, "r") do f
+        version = strip(readline(f))
+
+        if version == "minbpe v1"
+            return _load_bpetokenizer(f)
+        else
+            error("Unsupported version $version")
+        end
+    end
 end
