@@ -9,7 +9,7 @@ export AbstractTokenizer
 export train, encode, decode
 export tokenizer, data, offsets, bytelengths, merges, special_tokens
 export vocabulary_size, token, add_token!
-export precision
+export tokenprecision
 export save, load
 
 include("bpe.jl")
