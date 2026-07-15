@@ -59,6 +59,22 @@ struct BPETokenizer{I<:Integer} <: AbstractTokenizer
             special_tokens,
         )
     end
+
+    function BPETokenizer{I}(
+        vocabulary_data::Vector{UInt8},
+        vocabulary_offsets::Vector{Int},
+        vocabulary_bytelengths::Vector{Int},
+        merges::Dict{Tuple{I,I},I},
+        special_tokens::Dict{String,I},
+    ) where {I<:Integer}
+        return new{I}(
+            vocabulary_data,
+            vocabulary_offsets,
+            vocabulary_bytelengths,
+            merges,
+            special_tokens,
+        )
+    end
 end
 
 data(bpet::BPETokenizer) = bpet.vocabulary_data
